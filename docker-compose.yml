@@ -1,0 +1,171 @@
+version: "3.9"
+
+services:
+  # ============================================================
+  # Neo4j - Graph Database (Module B1)
+  # ============================================================
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: highlands-neo4j
+    ports:
+      - "7474:7474"   # Browser
+      - "7687:7687"   # Bolt
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-highlands2024}
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
+      - NEO4J_dbms_memory_heap_max__size=1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - ./configs/neo4j:/import
+    healthcheck:
+      test: ["CMD-SHELL", "neo4j status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - highlands-net
+
+  # ============================================================
+  # Redis - Session Cache & Semantic Cache (Module B2.3, A2.2)
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: highlands-redis
+    ports:
+      - "6379:6379"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./configs/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - highlands-net
+
+  # ============================================================
+  # TEI - Text Embeddings Inference (Module B1.2)
+  # ============================================================
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.5
+    container_name: highlands-tei
+    ports:
+      - "8080:80"
+    command: --model-id ${TEI_MODEL:-Qwen/Qwen3-Embedding-0.6B} --port 80
+    volumes:
+      - tei_cache:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - highlands-net
+
+  # ============================================================
+  # SGLang Router - Intent Classification (Module A1.1)
+  # ============================================================
+  # sglang-router:
+  #   image: lmsysorg/sglang:latest
+  #   container_name: highlands-sglang-router
+  #   ports:
+  #     - "30000:30000"
+  #   command: >
+  #     python -m sglang.launch_server
+  #     --model-path ${SGLANG_ROUTER_MODEL:-router-awq}
+  #     --port 30000
+  #     --context-length 512
+  #     --mem-fraction-static 0.15
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   depends_on:
+  #     neo4j:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:30000/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+  #   networks:
+  #     - highlands-net
+
+  # ============================================================
+  # SGLang Generator - Response Generation (Module B2.1)
+  # ============================================================
+  # sglang-generator:
+  #   image: lmsysorg/sglang:latest
+  #   container_name: highlands-sglang-generator
+  #   ports:
+  #     - "30001:30001"
+  #   command: >
+  #     python -m sglang.launch_server
+  #     --model-path ${SGLANG_GENERATOR_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}
+  #     --port 30001
+  #     --mem-fraction-static 0.65
+  #     --chunked-prefill-size 2048
+  #     --max-running-requests 4
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   depends_on:
+  #     neo4j:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:30001/health"]
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 10
+  #   networks:
+  #     - highlands-net
+
+  # ============================================================
+  # FastAPI Gateway (All modules)
+  # ============================================================
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: highlands-gateway
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - REDIS_HOST=redis
+      - TEI_HOST=http://tei:80
+      # - SGLANG_ROUTER_HOST=http://sglang-router:30000
+      # - SGLANG_GENERATOR_HOST=http://sglang-generator:30001
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    networks:
+      - highlands-net
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  redis_data:
+  tei_cache:
+
+networks:
+  highlands-net:
+    driver: bridge

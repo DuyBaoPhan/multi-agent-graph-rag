@@ -1,0 +1,21 @@
+# SGLang Server Configuration
+# Used by docker-compose for model serving
+
+router:
+  model_path: "data/models/router-awq"
+  port: 30000
+  context_length: 512
+  mem_fraction_static: 0.15
+  max_running_requests: 8
+  # VRAM budget: ~1.1GB
+
+generator:
+  model_path: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+  port: 30001
+  context_length: 4096
+  mem_fraction_static: 0.65
+  chunked_prefill_size: 2048
+  max_running_requests: 4
+  # VRAM budget: ~4.8GB
+
+# Total VRAM: ~5.9GB + overhead ≈ fits in 12GB RTX 3060
