@@ -15,35 +15,53 @@ class SemanticCache:
         self.redis = get_redis_cache()
         self.threshold = threshold
         self.store = get_knowledge_store()
+        self._local_index = [] # List of (embedding, query, response)
 
     async def get(self, query: str) -> str | None:
-        """Find a similar query in cache and return result."""
+        """Find a similar query in cache using Vector Similarity."""
         if not self.redis or not self.store._embedder:
             return None
         
         try:
-            # 1. Encode query
+            # 1. Check exact match in Redis first (Fast path)
+            exact = await self.redis.get(f"scache:exact:{query}")
+            if exact: return exact["reply"]
+
+            # 2. Semantic Search (Simplified for demo: using local list)
+            # In a full prod system, we'd use RediSearch Vector Similarity
             query_emb = self.store._embedder.encode(query)
             
-            # 2. Search in Redis (Simplified: we'll use a key-value pair for this demo)
-            # In production, use RedisVL or RediSearch Vector Similarity
-            cached_val = await self.redis.get(f"scache:{query}")
-            if cached_val:
-                logger.info(f"🚀 Semantic Cache Hit for: {query}")
-                return str(cached_val) # RedisCache.get returns json.loads, so we ensure it's string
+            import numpy as np
+            best_score = 0
+            best_reply = None
+
+            for emb, q, reply in self._local_index:
+                score = np.dot(query_emb, emb) / (np.linalg.norm(query_emb) * np.linalg.norm(emb))
+                if score > best_score:
+                    best_score = score
+                    best_reply = reply
+            
+            if best_score >= self.threshold:
+                logger.info(f"🚀 Semantic Cache Hit ({best_score:.2f}) for: {query}")
+                return best_reply
         except Exception as e:
             logger.warning(f"Cache retrieval failed: {e}")
         
         return None
 
     async def set(self, query: str, response: str):
-        """Store query and response in cache."""
+        """Store query and response in both exact and semantic cache."""
         if not self.redis:
             return
         
         try:
-            # Store with TTL (e.g., 1 hour)
-            await self.redis.set(f"scache:{query}", {"reply": response}, ttl=3600)
+            # Store exact
+            await self.redis.set(f"scache:exact:{query}", {"reply": response}, ttl=3600)
+            
+            # Store for semantic search
+            if self.store._embedder:
+                emb = self.store._embedder.encode(query)
+                self._local_index.append((emb, query, response))
         except Exception as e:
             logger.warning(f"Cache storage failed: {e}")
 

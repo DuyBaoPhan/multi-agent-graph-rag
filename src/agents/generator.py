@@ -6,6 +6,7 @@ Ensures the tone is consistent with Highlands Coffee brand.
 """
 
 import httpx
+import time
 from loguru import logger
 from src.config import get_settings
 
@@ -18,17 +19,47 @@ Quy tắc:
 
 class ResponseGenerator:
     def __init__(self):
-        self.settings = get_settings()
+        settings = get_settings()
+        self.url = f"{settings.sglang_generator_host}/v1/chat/completions"
+        self.is_healthy = False
+        self._last_check = 0
+
+    async def _check_health(self):
+        """Check if SGLang Generator is alive once in a while."""
+        now = time.time()
+        if now - self._last_check < 60: # Check every 60s
+            return self.is_healthy
+        
+        try:
+            async with httpx.AsyncClient(timeout=1.0) as client:
+                resp = await client.get(self.url.replace("/v1/chat/completions", "/health"))
+                self.is_healthy = resp.status_code == 200
+        except:
+            self.is_healthy = False
+        
+        self._last_check = now
+        return self.is_healthy
 
     async def generate(self, raw_data: str, user_query: str) -> str:
-        """Humanize the raw data into a friendly response."""
-        # Check if SGLang Generator is available
-        if self.settings.sglang_generator_host:
+        """Humanize response via LLM if available, otherwise use rule-base."""
+        if await self._check_health():
             try:
-                return await self._generate_via_sglang(raw_data, user_query)
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    resp = await client.post(
+                        self.url,
+                        json={
+                            "model": "generator",
+                            "messages": [
+                                {"role": "system", "content": GENERATOR_SYSTEM_PROMPT},
+                                {"role": "user", "content": f"Dữ liệu: {raw_data}\nCâu hỏi khách: {user_query}"}
+                            ],
+                            "temperature": 0.7,
+                        }
+                    )
+                    resp.raise_for_status()
+                    return resp.json()["choices"][0]["message"]["content"]
             except Exception as e:
-                logger.warning(f"SGLang Generator failed: {e}. Returning raw data.")
-                return raw_data
+                logger.warning(f"SGLang Generator failed: {e}")
         
         # Fallback: Just return raw data if no LLM is configured for generation
         # In production, this would call GPT-4o or Qwen-7B
@@ -51,12 +82,15 @@ class ResponseGenerator:
             return resp.json()["choices"][0]["message"]["content"]
 
     def _rule_based_polish(self, data: str) -> str:
-        """Simple fallback to add a polite touch if no LLM generator is available."""
-        if not data.startswith("Dạ"):
-            data = "Dạ, " + data
-        if not data.endswith(("ạ", "!", ".")):
-            data += " ạ."
-        return data
+        """Simple fallback to add a polite touch without doubling markers."""
+        res = data.strip()
+        # Add 'Dạ' if not already present
+        if not res.lower().startswith("dạ"):
+            res = "Dạ, " + res
+        # Add 'ạ' if not already present at the end
+        if not res.endswith(("ạ", "!", ".", "?")):
+            res += " ạ."
+        return res
 
 # Singleton
 _generator = None

@@ -77,7 +77,10 @@ class OrderAgent(BaseAgent):
             size_target = "S"
 
         # 3. Try to find item name by stripping action keywords
-        clean_query = re.sub(r"(cho|lấy|đặt|thêm|order|mua|gọi|bán|có|còn|\d+|size|ly|cốc|l\b|m\b|s\b)", "", query_lower).strip()
+        # Refined regex to handle Vietnamese stop words better
+        stop_words = r"(cho|lấy|đặt|thêm|order|mua|gọi|bán|có|còn|ly|cốc|size|vừa|lớn|nhỏ|to|bé|nữa|mình|em|anh|chị)"
+        clean_query = re.sub(stop_words, "", query_lower)
+        clean_query = re.sub(r"\d+", "", clean_query).strip()
         
         # 4. Search menu for best match (Graph RAG priority)
         try:

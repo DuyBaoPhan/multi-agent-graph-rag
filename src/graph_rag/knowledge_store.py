@@ -121,6 +121,14 @@ class KnowledgeStore:
 
     # ── Menu Search ──────────────────────────────────────────
 
+    def get_item_by_name(self, name: str) -> MenuItem | None:
+        """Find a menu item by exact name (case-insensitive)."""
+        name_lower = name.lower()
+        for item in self.menu_items:
+            if item.name.lower() == name_lower:
+                return item
+        return None
+
     def search_menu(self, query: str, top_k: int = 5) -> list[MenuItem]:
         """Search menu items by keyword matching."""
         query_lower = query.lower()

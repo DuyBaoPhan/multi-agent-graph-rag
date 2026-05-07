@@ -50,14 +50,24 @@ class RedisCache:
             await self.client.close()
 
     async def get(self, key: str) -> dict | None:
-        value = await self.client.get(key)
-        if value:
-            return json.loads(value)
+        if not self.client:
+            return None
+        try:
+            value = await self.client.get(key)
+            if value:
+                return json.loads(value)
+        except Exception as e:
+            logger.warning(f"Redis GET failed: {e}")
         return None
 
     async def set(self, key: str, value: dict, ttl: int | None = None):
-        ttl = ttl or self.settings.cache_ttl_seconds
-        await self.client.setex(key, ttl, json.dumps(value, ensure_ascii=False))
+        if not self.client:
+            return
+        try:
+            ttl = ttl or self.settings.cache_ttl_seconds
+            await self.client.setex(key, ttl, json.dumps(value, ensure_ascii=False))
+        except Exception as e:
+            logger.warning(f"Redis SET failed: {e}")
 
     async def delete(self, key: str):
         await self.client.delete(key)

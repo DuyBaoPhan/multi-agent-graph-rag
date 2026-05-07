@@ -17,9 +17,9 @@ from src.router.serving import classify_intent
 from src.agents.dispatcher import AgentDispatcher
 from src.agents.session_store import SessionStore
 from src.guardrails.input_validator import validate_input
+from src.llm_serving.cache.semantic_cache import get_semantic_cache
 from src.guardrails.fallback import get_fallback_response
 from src.agents.generator import get_generator
-from src.llm_serving.cache.semantic_cache import get_semantic_cache
 
 router = APIRouter()
 
@@ -50,6 +50,20 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=400, detail=sanitized)
 
     session_id = request.session_id or str(uuid.uuid4())
+    
+    # 1. Check Semantic Cache (Module C2.2)
+    sem_cache = get_semantic_cache()
+    cached_reply = await sem_cache.get(sanitized)
+    if cached_reply:
+        return ChatResponse(
+            reply=cached_reply,
+            session_id=session_id,
+            intent="cached",
+            agent="semantic_cache",
+            cached=True,
+            latency_ms=0.0
+        )
+
     history = _session_store.get_history(session_id)
 
     try:
@@ -68,7 +82,7 @@ async def chat(request: ChatRequest):
         reply = await generator.generate(reply, sanitized)
         
         # 3. Store in Semantic Cache
-        await cache.set(sanitized, reply)
+        await sem_cache.set(sanitized, reply)
     except Exception as e:
         logger.error(f"Agent failed: {e}")
         reply = get_fallback_response(intent)
