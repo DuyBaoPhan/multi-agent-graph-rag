@@ -6,6 +6,7 @@ Considers: Taste, Budget, Weather, and Health.
 """
 
 import random
+from loguru import logger
 from src.agents.base_agent import BaseAgent
 from src.graph_rag.knowledge_store import get_knowledge_store
 from src.graph_rag.neo4j_client import get_neo4j_client
@@ -42,11 +43,12 @@ class ConsultantAgent(BaseAgent):
         try:
             if category_target:
                 graph_items = await neo4j.get_recommendations_by_category(category_target)
-                # Convert Neo4j records back to MenuItem objects
-                expanded_results = [
-                    store.get_item_by_name(r['name']) or store.menu_items[0]
-                    for r in graph_items
-                ]
+                # Convert Neo4j records back to MenuItem objects safely
+                expanded_results = []
+                for r in graph_items:
+                    item = store.get_item_by_name(r['name'])
+                    if item:
+                        expanded_results.append(item)
             else:
                 expanded_results = store.search_hybrid(query, domain="menu", top_k=4)
                 expanded_results = store.expand_graph(expanded_results)
