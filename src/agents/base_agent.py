@@ -22,7 +22,9 @@ class BaseAgent(ABC):
         self.system_prompt = system_prompt
 
     @abstractmethod
-    async def process(self, query: str, session_history: list[dict]) -> str:
+    async def process(
+        self, query: str, session_history: list[dict], session_id: str | None = None
+    ) -> str:
         """
         Process a user query and return a response.
         

@@ -1,65 +1,62 @@
 """
-Neo4j Seed Script
-===================
-Seed Neo4j with initial Highlands Coffee menu data (Module B1.1).
+Neo4j Seeding Script — Module B1.2
+===================================
+Loads Menu and FAQ data from CSV into Neo4j Graph.
 """
 
+import csv
 import asyncio
-
+from pathlib import Path
 from loguru import logger
+from src.graph_rag.neo4j_client import get_neo4j_client
 
-# Sample Highlands Coffee menu data (≥100 items needed)
-SAMPLE_MENU = [
-    {"name": "Phin Sữa Đá", "price": 29000, "sizes": {"S": 29000, "M": 35000, "L": 39000}, "category": "Cà Phê"},
-    {"name": "Phin Đen Đá", "price": 29000, "sizes": {"S": 29000, "M": 35000, "L": 39000}, "category": "Cà Phê"},
-    {"name": "Bạc Xỉu", "price": 29000, "sizes": {"S": 29000, "M": 35000, "L": 39000}, "category": "Cà Phê"},
-    {"name": "Cà Phê Sữa Đá", "price": 29000, "sizes": {"S": 29000, "M": 35000, "L": 39000}, "category": "Cà Phê"},
-    {"name": "Phindi Hạnh Nhân", "price": 45000, "sizes": {"M": 45000, "L": 49000}, "category": "Phindi"},
-    {"name": "Phindi Choco", "price": 45000, "sizes": {"M": 45000, "L": 49000}, "category": "Phindi"},
-    {"name": "Phindi Kem Sữa", "price": 45000, "sizes": {"M": 45000, "L": 49000}, "category": "Phindi"},
-    {"name": "Freeze Trà Xanh", "price": 55000, "sizes": {"M": 55000, "L": 65000}, "category": "Freeze"},
-    {"name": "Freeze Cookies & Cream", "price": 55000, "sizes": {"M": 55000, "L": 65000}, "category": "Freeze"},
-    {"name": "Freeze Sô-cô-la", "price": 55000, "sizes": {"M": 55000, "L": 65000}, "category": "Freeze"},
-    {"name": "Trà Sen Vàng", "price": 45000, "sizes": {"M": 45000, "L": 55000}, "category": "Trà"},
-    {"name": "Trà Thạch Đào", "price": 45000, "sizes": {"M": 45000, "L": 55000}, "category": "Trà"},
-    {"name": "Trà Thanh Đào", "price": 45000, "sizes": {"M": 45000, "L": 55000}, "category": "Trà"},
-    # TODO: Add remaining items to reach ≥ 100
-]
+MENU_CSV = "data/raw/menu/highlands_menu.csv"
+FAQ_CSV = "data/raw/faq/highlands_faq.csv"
 
+async def seed_database():
+    client = get_neo4j_client()
+    await client.connect()
+    if not client.driver:
+        logger.error("Could not connect to Neo4j. Is the server running?")
+        return
 
-async def seed_menu(neo4j_client):
-    """Seed Neo4j with menu items."""
-    logger.info(f"Seeding {len(SAMPLE_MENU)} menu items...")
+    # 1. Clear existing data
+    logger.info("Cleaning up old data in Neo4j...")
+    async with client.driver.session() as session:
+        await session.run("MATCH (n) DETACH DELETE n")
 
-    for item in SAMPLE_MENU:
-        query = """
-        MERGE (m:MenuItem {name: $name})
-        SET m.category = $category, m.base_price = $base_price
-        WITH m
-        MERGE (cat:Category {name: $category})
-        MERGE (m)-[:BELONGS_TO]->(cat)
-        """
-        await neo4j_client.run_query(query, {
-            "name": item["name"],
-            "category": item["category"],
-            "base_price": item["price"],
-        })
+    # 2. Seed Menu Items
+    logger.info(f"Seeding Menu from {MENU_CSV}...")
+    with open(MENU_CSV, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        count = 0
+        for row in reader:
+            await client.create_product(
+                name=row["name"],
+                price=int(row["price"]),
+                size=row["size"],
+                category=row["category"],
+                description=row["description"]
+            )
+            count += 1
+        logger.info(f"✅ Created {count} Product nodes.")
 
-        # Create size variants
-        for size, price in item.get("sizes", {}).items():
-            size_query = """
-            MATCH (m:MenuItem {name: $name})
-            MERGE (s:Size {name: $size, price: $price})
-            MERGE (m)-[:HAS_SIZE]->(s)
-            """
-            await neo4j_client.run_query(size_query, {
-                "name": item["name"],
-                "size": size,
-                "price": price,
-            })
+    # 3. Seed FAQ Entries
+    logger.info(f"Seeding FAQ from {FAQ_CSV}...")
+    with open(FAQ_CSV, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        count = 0
+        for row in reader:
+            await client.create_faq(
+                question=row["question"],
+                answer=row["answer"],
+                category=row["category"]
+            )
+            count += 1
+        logger.info(f"✅ Created {count} FAQ nodes.")
 
-    logger.info("✅ Menu seeding complete")
-
+    await client.close()
+    logger.info("🎉 Database seeding complete!")
 
 if __name__ == "__main__":
-    asyncio.run(seed_menu(None))  # Pass actual client
+    asyncio.run(seed_database())

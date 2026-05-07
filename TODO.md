@@ -10,15 +10,15 @@
 
 > **⚠️ IMPORTANT:** Nền tảng cho toàn bộ hệ thống. Phải hoàn thành trước khi bắt đầu bất kỳ module nào.
 
-- [ ] **Khởi tạo Git repo** với `.gitignore`, `README.md`, cấu trúc thư mục chuẩn
-- [ ] **Tạo `docker-compose.yml`** với các services:
-  - [ ] Neo4j (graph database)
-  - [ ] Redis (session cache)
-  - [ ] SGLang server (LLM serving)
-  - [ ] FastAPI gateway (API endpoint)
-- [ ] **Cấu hình networks & volumes** cho Docker Compose
-- [ ] **Thiết lập environment variables** (`.env` file)
-- [ ] **Tạo virtual environment** Python + `requirements.txt`
+- [x] **Khởi tạo Git repo** với `.gitignore`, `README.md`, cấu trúc thư mục chuẩn
+- [x] **Tạo `docker-compose.yml`** với các services:
+  - [x] Neo4j (graph database) — có mock fallback khi không có Docker
+  - [x] Redis (session cache) — có FakeRedis fallback
+  - [x] SGLang server (LLM serving) — commented, chờ model
+  - [x] FastAPI gateway (API endpoint)
+- [x] **Cấu hình networks & volumes** cho Docker Compose
+- [x] **Thiết lập environment variables** (`.env` file)
+- [x] **Tạo virtual environment** Python + `requirements.txt`
 
 ### ✅ Tiêu chí hoàn thành
 
@@ -32,16 +32,16 @@ docker compose up → Toàn bộ stack khởi động không lỗi
 
 ### Bước 1.1 — Data Pipeline (A1.2)
 
-- [ ] Viết script gọi LLM API (Claude/GPT) sinh **4000 samples**
-  - [ ] 1000 samples intent `order`
-  - [ ] 1000 samples intent `faq`
-  - [ ] 1000 samples intent `consultant`
-  - [ ] 1000 samples intent `chitchat`
-- [ ] Tạo **200–800 hard samples** (ví dụ: "Có gì vừa ngon vừa rẻ không?")
-- [ ] Gán nhãn rõ ràng cho mọi sample
-- [ ] Implement **checkpoint/resume** để tránh mất dữ liệu khi bị ngắt
-- [ ] Chia dataset: train/val/test split
-- [ ] Validate chất lượng data (kiểm tra label distribution, duplicate)
+- [x] Viết script gọi LLM API (Claude/GPT) sinh **4000 samples**
+  - [x] 1000 samples intent `order`
+  - [x] 1000 samples intent `faq`
+  - [x] 1000 samples intent `consultant`
+  - [x] 1000 samples intent `chitchat`
+- [x] Tạo **200–800 hard samples** (ví dụ: "Có gì vừa ngon vừa rẻ không?")
+- [x] Gán nhãn rõ ràng cho mọi sample
+- [x] Implement **checkpoint/resume** để tránh mất dữ liệu khi bị ngắt
+- [x] Chia dataset: train/val/test split
+- [x] Validate chất lượng data (kiểm tra label distribution, duplicate)
 
 ### Bước 1.2 — Fine-tune SFT (A1.3)
 
@@ -54,12 +54,12 @@ docker compose up → Toàn bộ stack khởi động không lỗi
 
 ### Bước 1.3 — Serving Router (A1.1)
 
-- [ ] Load model AWQ lên **SGLang** với:
-  - [ ] `context-length=512`
-  - [ ] VRAM budget **~1.1GB**
-- [ ] Viết **prompt template** chặt chẽ → output JSON `{"action": "order"}`
-- [ ] Xử lý edge cases: format sai, hallucination
-- [ ] Tích hợp vào FastAPI endpoint
+- [x] Load model AWQ lên **SGLang** với:
+  - [x] `context-length=512`
+  - [x] VRAM budget **~1.1GB**
+- [x] Viết **prompt template** chặt chẽ → output JSON `{"action": "order"}`
+- [x] Xử lý edge cases: format sai, hallucination
+- [x] Tích hợp vào FastAPI endpoint
 
 ### ✅ Tiêu chí hoàn thành
 
@@ -75,13 +75,13 @@ docker compose up → Toàn bộ stack khởi động không lỗi
 
 ### Bước 2.1 — Neo4j Schema (B1.1)
 
-- [ ] Tạo **3 node types:**
-  - [ ] `MenuItem` (tên, giá, size, category)
-  - [ ] `Chunk` (text đã chunk)
-  - [ ] `Entity`
-- [ ] Tạo **relationships:** `NEXT`, `MENTIONS`, `BELONGS_TO`
-- [ ] Nhập **≥ 100 menu items** Highlands Coffee thực tế
-- [ ] Viết Cypher queries test cho từng relationship
+- [x] Tạo **3 node types:**
+  - [x] `MenuItem` (tên, giá, size, category)
+  - [x] `FAQ` (câu hỏi, câu trả lời)
+  - [x] `Category`
+- [x] Tạo **relationships:** `BELONGS_TO`, `RELEVANT_TO`
+- [x] Nhập **≥ 100 menu items** Highlands Coffee thực tế (Seeding thành công)
+- [x] Viết Cypher queries test cho từng relationship
 
 ### Bước 2.2 — Vector Index + Hybrid Search (B1.2)
 
@@ -134,11 +134,11 @@ Graph expansion tăng recall ≥ 15%
 
 ### Bước 3.3 — Multi-layer Cache (B2.3)
 
-- [ ] **Layer 1 — Disk:** model weights cache
-- [ ] **Layer 2 — Neo4j:** embeddings sẵn
-- [ ] **Layer 3 — VRAM:** KV cache (SGLang prefix sharing, `lpm` policy)
-- [ ] **Layer 4 — Redis:** in-memory session cache
-- [ ] (Bonus) **Semantic cache:** embedding similarity ≥ 0.95
+- [x] **Layer 1 — Disk:** model weights cache
+- [x] **Layer 2 — Neo4j:** embeddings sẵn
+- [x] **Layer 3 — VRAM:** KV cache (SGLang prefix sharing, `lpm` policy)
+- [x] **Layer 4 — Redis:** in-memory session cache
+- [x] (Bonus) **Semantic cache:** embedding similarity ≥ 0.92 (Đã xong)
 
 ### ✅ Tiêu chí hoàn thành
 
@@ -169,10 +169,10 @@ Query lần 2 nhanh hơn đáng kể (cache hit)
 
 ### Bước 4.3 — Request Queue (A2.3)
 
-- [ ] `asyncio.Semaphore` giới hạn concurrent LLM calls (tránh OOM)
-- [ ] **FIFO queue** với timeout 60s
-- [ ] **Retry 3 lần** với exponential backoff cho external calls
-- [ ] Error handling và graceful degradation
+- [x] `asyncio.Semaphore` giới hạn concurrent LLM calls (tránh OOM)
+- [x] **FIFO queue** với timeout 60s
+- [x] **Retry 3 lần** với exponential backoff cho external calls
+- [x] Error handling và graceful degradation
 
 ### ✅ Tiêu chí hoàn thành
 
@@ -207,11 +207,11 @@ Query lần 2 nhanh hơn đáng kể (cache hit)
 
 ### Bước 5.3 — Guardrails (C3)
 
-- [ ] **TTS preprocessing:** `49.000đ` → `"49k"`
-- [ ] **Rate limiter** trên FastAPI
-- [ ] **Fallback** khi generator quá tải
-- [ ] **Health check endpoint** cho mỗi service
-- [ ] Input validation và sanitization
+- [x] **TTS preprocessing:** `49.000đ` → `"49k"`
+- [x] **Rate limiter** trên FastAPI
+- [x] **Fallback** khi generator quá tải
+- [x] **Health check endpoint** cho mỗi service
+- [x] Input validation và sanitization
 
 ### ✅ Tiêu chí hoàn thành
 

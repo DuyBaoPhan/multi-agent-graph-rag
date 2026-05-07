@@ -38,6 +38,7 @@ class SessionStore:
             "created_at": time.time(),
             "last_active": time.time(),
             "summary": "",
+            "metadata": {"cart": []},
         }
         logger.info(f"Created session: {session_id}")
         return session_id
@@ -59,6 +60,7 @@ class SessionStore:
                 "created_at": time.time(),
                 "last_active": time.time(),
                 "summary": "",
+                "metadata": {"cart": []},
             }
 
         session = self.sessions[session_id]
@@ -101,3 +103,36 @@ class SessionStore:
         """Stop the background cleanup task."""
         if self._cleanup_task:
             self._cleanup_task.cancel()
+
+    def get_metadata(self, session_id: str) -> dict:
+        """Get session metadata (cart, user info, etc.)."""
+        session = self.sessions.get(session_id)
+        if not session:
+            return {"cart": []}
+        return session.get("metadata", {"cart": []})
+
+    def update_metadata(self, session_id: str, metadata: dict):
+        """Update session metadata."""
+        if session_id not in self.sessions:
+            self.sessions[session_id] = {
+                "history": [],
+                "created_at": time.time(),
+                "last_active": time.time(),
+                "summary": "",
+                "metadata": {"cart": []},
+            }
+        
+        self.sessions[session_id]["metadata"] = metadata
+        self.sessions[session_id]["last_active"] = time.time()
+
+
+# Singleton
+_store: SessionStore | None = None
+
+
+def get_session_store() -> SessionStore:
+    """Get or create the global SessionStore singleton."""
+    global _store
+    if _store is None:
+        _store = SessionStore()
+    return _store

@@ -26,13 +26,17 @@ class Settings(BaseSettings):
     # --- SGLang ---
     sglang_router_host: str = "http://localhost:30000"
     sglang_generator_host: str = "http://localhost:30001"
+    sglang_router_model: str = "router-awq"
+    sglang_generator_model: str = "Qwen/Qwen2.5-7B-Instruct-AWQ"
 
     # --- TEI ---
     tei_host: str = "http://localhost:8080"
+    tei_model: str = "Qwen/Qwen3-Embedding-0.6B"
 
     # --- FastAPI ---
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    api_workers: int = 1
     debug: bool = True
 
     # --- Session ---
@@ -48,7 +52,7 @@ class Settings(BaseSettings):
     semantic_cache_threshold: float = 0.92
     cache_ttl_seconds: int = 3600
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 @lru_cache

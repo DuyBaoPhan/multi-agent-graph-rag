@@ -1,0 +1,51 @@
+name,price,size,category,description
+Phin Sữa Đá,29000,S,Cà Phê,Cà phê phin truyền thống với sữa đặc
+Phin Sữa Đá,35000,M,Cà Phê,Cà phê phin truyền thống với sữa đặc
+Phin Sữa Đá,39000,L,Cà Phê,Cà phê phin truyền thống với sữa đặc
+Phin Đen Đá,29000,S,Cà Phê,Cà phê phin đen đậm đà
+Phin Đen Đá,35000,M,Cà Phê,Cà phê phin đen đậm đà
+Phin Đen Đá,39000,L,Cà Phê,Cà phê phin đen đậm đà
+Bạc Xỉu,29000,S,Cà Phê,Cà phê với nhiều sữa thơm béo
+Bạc Xỉu,35000,M,Cà Phê,Cà phê với nhiều sữa thơm béo
+Bạc Xỉu,39000,L,Cà Phê,Cà phê với nhiều sữa thơm béo
+Cà Phê Sữa Đá,29000,S,Cà Phê,Cà phê sữa đá truyền thống
+Cà Phê Sữa Đá,35000,M,Cà Phê,Cà phê sữa đá truyền thống
+Cà Phê Sữa Đá,39000,L,Cà Phê,Cà phê sữa đá truyền thống
+Phindi Hạnh Nhân,45000,M,Phindi,Cà phê Phindi vị hạnh nhân thơm ngậy
+Phindi Hạnh Nhân,49000,L,Phindi,Cà phê Phindi vị hạnh nhân thơm ngậy
+Phindi Choco,45000,M,Phindi,Cà phê Phindi vị socola đậm đà
+Phindi Choco,49000,L,Phindi,Cà phê Phindi vị socola đậm đà
+Phindi Kem Sữa,45000,M,Phindi,Cà phê Phindi kem sữa béo ngậy
+Phindi Kem Sữa,49000,L,Phindi,Cà phê Phindi kem sữa béo ngậy
+Freeze Trà Xanh,55000,M,Freeze,Trà xanh xay đá mát lạnh
+Freeze Trà Xanh,65000,L,Freeze,Trà xanh xay đá mát lạnh
+Freeze Cookies & Cream,55000,M,Freeze,Kem cookies xay đá thơm ngon
+Freeze Cookies & Cream,65000,L,Freeze,Kem cookies xay đá thơm ngon
+Freeze Sô-cô-la,55000,M,Freeze,Socola xay đá đậm đà
+Freeze Sô-cô-la,65000,L,Freeze,Socola xay đá đậm đà
+Freeze Trà Vải,55000,M,Freeze,Trà vải xay đá thơm mát
+Freeze Trà Vải,65000,L,Freeze,Trà vải xay đá thơm mát
+Trà Sen Vàng,45000,M,Trà,Trà ướp sen thơm thanh nhã
+Trà Sen Vàng,55000,L,Trà,Trà ướp sen thơm thanh nhã
+Trà Thạch Đào,45000,M,Trà,Trà đào với thạch giòn ngon
+Trà Thạch Đào,55000,L,Trà,Trà đào với thạch giòn ngon
+Trà Thanh Đào,45000,M,Trà,Trà đào thanh mát
+Trà Thanh Đào,55000,L,Trà,Trà đào thanh mát
+Trà Nhiệt Đới,45000,M,Trà,Trà trái cây nhiệt đới tươi mát
+Trà Nhiệt Đới,55000,L,Trà,Trà trái cây nhiệt đới tươi mát
+Đường Đen Sữa Đá,45000,M,Đường Đen,Đường đen kết hợp sữa tươi
+Đường Đen Sữa Đá,55000,L,Đường Đen,Đường đen kết hợp sữa tươi
+Đường Đen Marble,45000,M,Đường Đen,Đường đen marble độc đáo
+Đường Đen Marble,55000,L,Đường Đen,Đường đen marble độc đáo
+Caramel Macchiato,55000,M,Espresso,Espresso với sữa và caramel
+Caramel Macchiato,65000,L,Espresso,Espresso với sữa và caramel
+Americano,45000,M,Espresso,Espresso pha loãng kiểu Mỹ
+Americano,55000,L,Espresso,Espresso pha loãng kiểu Mỹ
+Latte,50000,M,Espresso,Espresso với sữa tươi mịn màng
+Latte,60000,L,Espresso,Espresso với sữa tươi mịn màng
+Cappuccino,50000,M,Espresso,Espresso với bọt sữa dày
+Cappuccino,60000,L,Espresso,Espresso với bọt sữa dày
+Bánh Mì Que Pate,15000,,Bánh,Bánh mì que giòn kẹp pate
+Bánh Mì Que Gà Cay,19000,,Bánh,Bánh mì que nhân gà cay
+Croissant Trứng Muối,29000,,Bánh,Croissant nhân trứng muối béo ngậy
+Mousse Cake Chocolate,35000,,Bánh,Bánh mousse chocolate mềm mịn

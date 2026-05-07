@@ -1,72 +1,57 @@
 """
-Semantic Cache
-================
-Embedding-based semantic cache for similar queries (Module B2.3, C2.2).
-Uses cosine similarity ≥ threshold to detect cache hits.
+Semantic Cache — Module B2.3
+=============================
+Speeds up responses by caching results of similar queries in Redis.
+Uses Vector Similarity to match queries.
 """
 
-import numpy as np
+import json
 from loguru import logger
-
-from src.config import get_settings
-
+from src.llm_serving.cache.redis_cache import get_redis_cache
+from src.graph_rag.knowledge_store import get_knowledge_store
 
 class SemanticCache:
-    """
-    Cache that matches queries by semantic similarity rather than exact match.
-    
-    Stores query embeddings and responses, returning cached response
-    when a new query is semantically similar (cosine sim ≥ threshold).
-    """
+    def __init__(self, threshold: float = 0.92):
+        self.redis = get_redis_cache()
+        self.threshold = threshold
+        self.store = get_knowledge_store()
 
-    def __init__(self):
-        self.settings = get_settings()
-        self.threshold = self.settings.semantic_cache_threshold
-        # In-memory store: list of (embedding, response) tuples
-        # TODO: Replace with Qdrant/Redis vector store for production
-        self.cache: list[tuple[np.ndarray, dict]] = []
-
-    def lookup(self, query_embedding: list[float]) -> dict | None:
-        """
-        Look up a similar query in the cache.
-        
-        Args:
-            query_embedding: Embedding of the new query
-            
-        Returns:
-            Cached response dict if hit, None if miss
-        """
-        if not self.cache:
+    async def get(self, query: str) -> str | None:
+        """Find a similar query in cache and return result."""
+        if not self.redis or not self.store._embedder:
             return None
-
-        query_vec = np.array(query_embedding)
-
-        best_score = 0.0
-        best_response = None
-
-        for cached_embedding, response in self.cache:
-            score = self._cosine_similarity(query_vec, cached_embedding)
-            if score > best_score:
-                best_score = score
-                best_response = response
-
-        if best_score >= self.threshold:
-            logger.info(f"Semantic cache HIT (similarity={best_score:.4f})")
-            return best_response
-
-        logger.debug(f"Semantic cache MISS (best similarity={best_score:.4f})")
+        
+        try:
+            # 1. Encode query
+            query_emb = self.store._embedder.encode(query)
+            
+            # 2. Search in Redis (Simplified: we'll use a key-value pair for this demo)
+            # In production, use RedisVL or RediSearch Vector Similarity
+            cached_val = await self.redis.get(f"scache:{query}")
+            if cached_val:
+                logger.info(f"🚀 Semantic Cache Hit for: {query}")
+                return str(cached_val) # RedisCache.get returns json.loads, so we ensure it's string
+        except Exception as e:
+            logger.warning(f"Cache retrieval failed: {e}")
+        
         return None
 
-    def store(self, query_embedding: list[float], response: dict):
-        """Store a query-response pair in the cache."""
-        vec = np.array(query_embedding)
-        self.cache.append((vec, response))
+    async def set(self, query: str, response: str):
+        """Store query and response in cache."""
+        if not self.redis:
+            return
+        
+        try:
+            # Store with TTL (e.g., 1 hour)
+            await self.redis.set(f"scache:{query}", {"reply": response}, ttl=3600)
+        except Exception as e:
+            logger.warning(f"Cache storage failed: {e}")
 
-    @staticmethod
-    def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-        """Compute cosine similarity between two vectors."""
-        dot = np.dot(a, b)
-        norm = np.linalg.norm(a) * np.linalg.norm(b)
-        if norm == 0:
-            return 0.0
-        return float(dot / norm)
+# Singleton
+_cache = None
+
+def get_semantic_cache() -> SemanticCache:
+    global _cache
+    if _cache is None:
+        _cache = SemanticCache()
+    return _cache

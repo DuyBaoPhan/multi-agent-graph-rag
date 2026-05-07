@@ -4,31 +4,29 @@ Health Check Routes
 Endpoints for monitoring service health (Module C3).
 """
 
-from fastapi import APIRouter
-from loguru import logger
+from fastapi import APIRouter, Request
 
 router = APIRouter()
 
 
 @router.get("/health")
-async def health_check():
+async def health_check(request: Request):
     """Overall system health check."""
-    # TODO: Check Neo4j, Redis, SGLang connections
+    neo4j_health = {"status": "unknown"}
+    redis_health = {"status": "unknown"}
+
+    if hasattr(request.app.state, "neo4j"):
+        neo4j_health = await request.app.state.neo4j.health_check()
+    if hasattr(request.app.state, "redis"):
+        redis_health = await request.app.state.redis.health_check()
+
     return {
         "status": "healthy",
         "version": "0.1.0",
         "services": {
-            "neo4j": "unknown",
-            "redis": "unknown",
-            "sglang_router": "unknown",
-            "sglang_generator": "unknown",
-            "tei": "unknown",
+            "neo4j": neo4j_health,
+            "redis": redis_health,
+            "sglang_router": "not_connected",
+            "sglang_generator": "not_connected",
         },
     }
-
-
-@router.get("/health/{service}")
-async def service_health(service: str):
-    """Individual service health check."""
-    # TODO: Implement per-service health checks
-    return {"service": service, "status": "unknown"}

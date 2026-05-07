@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highlands Coffee AI Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #B22222; /* Highlands Red */
+            --primary-dark: #8B0000;
+            --accent: #DAA520; /* Gold */
+            --bg-dark: #0f0f0f;
+            --card-bg: #1a1a1a;
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(178, 34, 34, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(218, 165, 32, 0.1) 0%, transparent 40%);
+        }
+
+        /* Header */
+        header {
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-container h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 255, 127, 0.1);
+            color: #00ff7f;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid rgba(0, 255, 127, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #00ff7f;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff7f;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Main Layout */
+        main {
+            flex: 1;
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            gap: 2rem;
+            padding: 2rem;
+            overflow: hidden;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--card-bg);
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            overflow: hidden;
+            position: relative;
+        }
+
+        #chat-history {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--glass-border) transparent;
+        }
+
+        #chat-history::-webkit-scrollbar { width: 6px; }
+        #chat-history::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+
+        .message {
+            max-width: 80%;
+            padding: 1rem 1.25rem;
+            border-radius: 18px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 10px 20px rgba(178, 34, 34, 0.2);
+        }
+
+        .message.bot {
+            align-self: flex-start;
+            background: var(--glass);
+            color: var(--text-main);
+            border-bottom-left-radius: 4px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .message.bot pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: inherit;
+        }
+
+        .metadata {
+            font-size: 0.7rem;
+            margin-top: 8px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 12px;
+        }
+
+        .metadata span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 1.5rem;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            gap: 12px;
+        }
+
+        input {
+            flex: 1;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 1rem 1.5rem;
+            border-radius: 14px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            background: rgba(255,255,255,0.08);
+            box-shadow: 0 0 0 4px rgba(218, 165, 32, 0.1);
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 1.5rem;
+            border-radius: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(178, 34, 34, 0.4);
+        }
+
+        button:active { transform: translateY(0); }
+
+        button:disabled {
+            background: var(--glass-border);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Sidebar Info */
+        .sidebar {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .info-card {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .info-card h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .feature-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            margin: 4px;
+            border: 1px solid var(--glass-border);
+        }
+
+        /* Loading Animation */
+        .typing {
+            display: flex;
+            gap: 4px;
+            padding: 10px 15px;
+            background: var(--glass);
+            border-radius: 12px;
+            width: fit-content;
+            margin-bottom: 1rem;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .dot:nth-child(2) { animation-delay: 0.2s; }
+        .dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            main { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 2L18.5 10H26L20 15L22.5 23L16 18L9.5 23L12 15L6 10H13.5L16 2Z" fill="#DAA520"/>
+            </svg>
+            <h1>HIGHLANDS AI</h1>
+        </div>
+        <div class="status-badge" id="status-badge">
+            <div class="status-dot"></div>
+            <span id="status-text">Backend Connected</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="chat-container">
+            <div id="chat-history">
+                <div class="message bot">
+                    Xin chào! 👋 Tôi là trợ lý ảo của Highlands Coffee. Tôi có thể giúp bạn xem menu, đặt món hoặc giải đáp các thắc mắc. Bạn muốn dùng gì hôm nay?
+                </div>
+            </div>
+
+            <div id="loading-indicator" style="display: none; padding-left: 1.5rem;">
+                <div class="typing">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <input type="text" id="user-input" placeholder="Nhập tin nhắn..." autocomplete="off">
+                <button id="send-btn">
+                    <span>Gửi</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="info-card">
+                <h3>✨ Tính năng</h3>
+                <div>
+                    <span class="feature-tag">Đặt hàng</span>
+                    <span class="feature-tag">Tra cứu menu</span>
+                    <span class="feature-tag">Hỏi đáp FAQ</span>
+                    <span class="feature-tag">Tư vấn món</span>
+                    <span class="feature-tag">Multi-Agent</span>
+                </div>
+            </div>
+            <div class="info-card">
+                <h3>📊 Hệ thống</h3>
+                <p>Hệ thống đang chạy ở chế độ <b>Development Mode</b>.</p>
+                <div style="margin-top: 10px; font-size: 0.8rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px">
+                        <span>Neo4j</span> <span style="color:#00ff7f">Mock (Memory)</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px">
+                        <span>Redis</span> <span style="color:#00ff7f">FakeRedis</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between">
+                        <span>LLM</span> <span style="color:var(--accent)">Rule-based</span>
+                    </div>
+                </div>
+            </div>
+            <div class="info-card" style="flex:1">
+                <h3>💡 Câu hỏi mẫu</h3>
+                <p style="cursor:pointer; margin-bottom:8px" onclick="fillInput('Cho mình xem menu cà phê')">👉 Cho mình xem menu cà phê</p>
+                <p style="cursor:pointer; margin-bottom:8px" onclick="fillInput('Món nào rẻ nhất?')">👉 Món nào rẻ nhất?</p>
+                <p style="cursor:pointer; margin-bottom:8px" onclick="fillInput('Giờ mở cửa thế nào?')">👉 Giờ mở cửa thế nào?</p>
+                <p style="cursor:pointer" onclick="fillInput('Tư vấn cho mình món gì mát lạnh')">👉 Tư vấn món gì mát lạnh</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const chatHistory = document.getElementById('chat-history');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const statusBadge = document.getElementById('status-badge');
+        const statusText = document.getElementById('status-text');
+
+        let sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+
+        // Check backend health
+        async function checkHealth() {
+            try {
+                const resp = await fetch('http://localhost:8000/health');
+                if (resp.ok) {
+                    statusBadge.style.background = 'rgba(0, 255, 127, 0.1)';
+                    statusBadge.style.color = '#00ff7f';
+                    statusBadge.style.borderColor = 'rgba(0, 255, 127, 0.2)';
+                    statusText.innerText = 'Backend Connected';
+                } else {
+                    throw new Error();
+                }
+            } catch (e) {
+                statusBadge.style.background = 'rgba(255, 69, 0, 0.1)';
+                statusBadge.style.color = '#ff4500';
+                statusBadge.style.borderColor = 'rgba(255, 69, 0, 0.2)';
+                statusText.innerText = 'Backend Offline';
+            }
+        }
+        setInterval(checkHealth, 5000);
+        checkHealth();
+
+        function addMessage(text, isUser, metadata = null) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            const content = document.createElement('pre');
+            content.innerText = text;
+            msgDiv.appendChild(content);
+
+            if (metadata) {
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'metadata';
+                metaDiv.innerHTML = `
+                    <span>🔍 Intent: ${metadata.intent}</span>
+                    <span>🤖 Agent: ${metadata.agent}</span>
+                    <span>⚡ ${metadata.latency_ms}ms</span>
+                `;
+                msgDiv.appendChild(metaDiv);
+            }
+
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            userInput.value = '';
+            addMessage(message, true);
+            
+            // Show loading
+            loadingIndicator.style.display = 'block';
+            sendBtn.disabled = true;
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: sessionId
+                    })
+                });
+
+                const data = await response.json();
+                
+                loadingIndicator.style.display = 'none';
+                sendBtn.disabled = false;
+
+                if (response.ok) {
+                    addMessage(data.reply, false, data);
+                } else {
+                    addMessage('Lỗi: ' + (data.detail || 'Không thể kết nối API'), false);
+                }
+            } catch (error) {
+                loadingIndicator.style.display = 'none';
+                sendBtn.disabled = false;
+                addMessage('Lỗi kết nối máy chủ. Vui lòng kiểm tra backend.', false);
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function fillInput(text) {
+            userInput.value = text;
+            userInput.focus();
+        }
+    </script>
+</body>
+</html>
