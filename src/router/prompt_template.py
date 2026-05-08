@@ -11,7 +11,7 @@ Phân loại câu hỏi của khách hàng vào ĐÚNG 1 trong 4 intent sau:
 - "order": Khách muốn đặt đồ uống, hỏi giá, hỏi menu, thêm/bớt món
 - "faq": Khách hỏi về chính sách, giờ mở cửa, địa chỉ, khuyến mãi, thông tin chung
 - "consultant": Khách cần tư vấn chọn đồ uống phù hợp, so sánh, gợi ý
-- "chitchat": Chào hỏi, cảm ơn, tạm biệt, nói chuyện phiếm
+- "ignore": Chào hỏi, cảm ơn, tạm biệt, nói chuyện phiếm
 
 Trả lời CHÍNH XÁC theo JSON format, không thêm bất kỳ text nào khác."""
 
@@ -23,7 +23,7 @@ ROUTER_FEW_SHOT_EXAMPLES = [
     {"query": "Cho tôi một ly Phở đi Freeze size L", "output": '{"action": "order"}'},
     {"query": "Highlands mở cửa mấy giờ?", "output": '{"action": "faq"}'},
     {"query": "Nên uống gì cho mát vào mùa hè?", "output": '{"action": "consultant"}'},
-    {"query": "Cảm ơn bạn nhé!", "output": '{"action": "chitchat"}'},
+    {"query": "Cảm ơn bạn nhé!", "output": '{"action": "ignore"}'},
     {"query": "Có gì vừa ngon vừa rẻ không?", "output": '{"action": "consultant"}'},
     {"query": "Tổng cộng tiền hết bao nhiêu?", "output": '{"action": "order"}'},
 ]

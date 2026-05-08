@@ -53,3 +53,4 @@ loguru>=0.7.0
 tenacity>=9.0.0            # Retry with backoff
 tqdm>=4.67.0
 pyyaml>=6.0.0
+gtts

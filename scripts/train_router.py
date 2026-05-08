@@ -23,7 +23,7 @@ def format_prompts(examples):
     """Format JSONL data into ChatML format for Qwen."""
     texts = []
     for text, intent in zip(examples["text"], examples["intent"]):
-        prompt = f"<|im_start|>system\nPhân loại ý định người dùng vào một trong các nhóm: order, faq, consultant, chitchat. Trả về JSON: {{\"action\": \"intent\"}}<|im_end|>\n"
+        prompt = f"<|im_start|>system\nPhân loại ý định người dùng vào một trong các nhóm: order, faq, consultant, ignore. Trả về JSON: {{\"action\": \"intent\"}}<|im_end|>\n"
         prompt += f"<|im_start|>user\n{text}<|im_end|>\n"
         prompt += f"<|im_start|>assistant\n{{\"action\": \"{intent}\"}}<|im_end|>"
         texts.append(prompt)

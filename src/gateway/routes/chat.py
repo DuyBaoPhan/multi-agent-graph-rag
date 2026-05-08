@@ -48,7 +48,7 @@ async def chat(request: ChatRequest):
         router_mode = str(router_result.get("mode", "unknown"))
     except Exception as e:
         logger.error(f"Router failed: {e}")
-        intent, router_mode = "chitchat", "fallback"
+        intent, router_mode = "ignore", "fallback"
 
     # 1. Semantic Cache Check
     sem_cache = get_semantic_cache()

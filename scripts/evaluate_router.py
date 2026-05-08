@@ -39,7 +39,7 @@ def evaluate():
         label = data["intent"]
 
         # Prepare prompt
-        prompt = f"<|im_start|>system\nPhân loại ý định vào: order, faq, consultant, chitchat. Trả về JSON: {{\"action\": \"intent\"}}<|im_end|>\n"
+        prompt = f"<|im_start|>system\nPhân loại ý định vào: order, faq, consultant, ignore. Trả về JSON: {{\"action\": \"intent\"}}<|im_end|>\n"
         prompt += f"<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n"
         
         inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
@@ -50,11 +50,11 @@ def evaluate():
         
         # Parse result
         try:
-            pred_intent = json.loads(response).get("action", "chitchat")
+            pred_intent = json.loads(response).get("action", "ignore")
         except:
             # Fallback parsing
-            pred_intent = "chitchat"
-            for m in ["order", "faq", "consultant", "chitchat"]:
+            pred_intent = "ignore"
+            for m in ["order", "faq", "consultant", "ignore"]:
                 if m in response.lower():
                     pred_intent = m
                     break

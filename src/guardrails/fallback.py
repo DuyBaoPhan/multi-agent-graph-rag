@@ -10,7 +10,7 @@ FALLBACK_RESPONSES = {
     "order": "Xin lỗi, hệ thống đặt hàng đang bận. Vui lòng thử lại sau ít phút hoặc gọi hotline 1900-xxxx.",
     "faq": "Xin lỗi, tôi chưa thể tra cứu thông tin lúc này. Vui lòng thử lại sau.",
     "consultant": "Xin lỗi, dịch vụ tư vấn đang tạm ngưng. Vui lòng thử lại sau.",
-    "chitchat": "Xin lỗi, tôi đang bận chút. Bạn vui lòng chờ một lát nhé!",
+    "ignore": "Xin lỗi, tôi đang bận chút. Bạn vui lòng chờ một lát nhé!",
     "default": "Xin lỗi, hệ thống đang quá tải. Vui lòng thử lại sau ít phút.",
 }
 

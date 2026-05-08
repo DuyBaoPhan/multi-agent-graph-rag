@@ -6,7 +6,7 @@ Intent classification với 3 chế độ:
   2. API     — gọi Claude/GPT làm fallback (khi chưa có model)
   3. RuleBase — rule đơn giản (offline, zero-latency, dev mode)
 
-Output chuẩn: {"action": "order" | "faq" | "consultant" | "chitchat"}
+Output chuẩn: {"action": "order" | "faq" | "consultant" | "ignore"}
 """
 
 import json
@@ -31,7 +31,7 @@ except ImportError:
 from src.config import get_settings
 from src.router.prompt_template import build_router_prompt
 
-VALID_INTENTS = {"order", "faq", "consultant", "chitchat"}
+VALID_INTENTS = {"order", "faq", "consultant", "ignore"}
 
 
 class RouterMode(str, Enum):
@@ -60,7 +60,7 @@ _CONSULTANT_KEYWORDS = [
     r"\b(mát|lạnh|ấm|nóng|tươi mát|giải nhiệt)\b",
     r"\b(so sánh|khác nhau|cái nào|loại nào|món nào)\b",
 ]
-_CHITCHAT_KEYWORDS = [
+_IGNORE_KEYWORDS = [
     r"\b(xin chào|chào|hello|hi\b|hey\b)\b",
     r"\b(cảm ơn|thank|tạm biệt|bye|goodbye|hẹn gặp)\b",
     r"\b(bạn tên|bạn là|ai vậy|bot|chatbot)\b",
@@ -72,9 +72,9 @@ def _rule_based_classify(text: str) -> str:
     text_lower = text.lower()
 
     scores = {intent: 0 for intent in VALID_INTENTS}
-    for pattern in _CHITCHAT_KEYWORDS:
+    for pattern in _IGNORE_KEYWORDS:
         if re.search(pattern, text_lower):
-            scores["chitchat"] += 2
+            scores["ignore"] += 2
     for pattern in _FAQ_KEYWORDS:
         if re.search(pattern, text_lower):
             scores["faq"] += 2
@@ -87,7 +87,7 @@ def _rule_based_classify(text: str) -> str:
 
     best = max(scores, key=lambda k: scores[k])
     if scores[best] == 0:
-        return "chitchat"  # default
+        return "ignore"  # default
     return best
 
 
@@ -216,7 +216,14 @@ async def _classify_via_local_hf(query: str) -> dict:
     if not model:
         raise RuntimeError("Local HF engine not initialized")
     
-    prompt = f"<|im_start|>system\nPhân loại ý định: order, consultant, faq, chitchat. Trả về JSON: {{\"action\": \"intent\"}}<|im_end|>\n<|im_start|>user\n{query}<|im_end|>\n<|im_start|>assistant\n"
+    messages = build_router_prompt(query, use_few_shot=True)
+    
+    prompt = ""
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+        prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+    prompt += "<|im_start|>assistant\n"
     
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():
@@ -232,7 +239,7 @@ def _parse_action(text: str) -> dict:
     text = text.strip()
     try:
         data = json.loads(text)
-        action = data.get("action", "chitchat")
+        action = data.get("action", "ignore")
         if action in VALID_INTENTS:
             return {"action": action}
     except json.JSONDecodeError:
@@ -244,8 +251,8 @@ def _parse_action(text: str) -> dict:
             logger.warning(f"Router: JSON parse failed, extracted '{intent}' from text")
             return {"action": intent}
 
-    logger.warning(f"Router: cannot parse response '{text}', defaulting to chitchat")
-    return {"action": "chitchat"}
+    logger.warning(f"Router: cannot parse response '{text}', defaulting to ignore")
+    return {"action": "ignore"}
 
 
 # ─── Main classify function ───────────────────────────────────────────────────
@@ -261,7 +268,7 @@ async def classify_intent(
       - API if API key available
       - RULE_BASE as final fallback
 
-    Returns: {"action": "order" | "faq" | "consultant" | "chitchat",
+    Returns: {"action": "order" | "faq" | "consultant" | "ignore",
               "mode": "sglang|api|rule_base", "latency_ms": float}
     """
     t0 = time.perf_counter()
@@ -271,7 +278,7 @@ async def classify_intent(
     if mode is None:
         mode = await _detect_best_mode(settings.sglang_router_host)
 
-    result: dict = {"action": "chitchat"}
+    result: dict = {"action": "ignore"}
     try:
         if mode == RouterMode.LOCAL_HF:
             result = await _classify_via_local_hf(query)

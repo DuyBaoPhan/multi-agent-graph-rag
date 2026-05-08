@@ -34,13 +34,13 @@ class AgentDispatcher:
     async def dispatch(
         self, intent: str, query: str, session_history: list[dict], session_id: str | None = None
     ) -> str:
-        if intent == "chitchat":
-            return self._handle_chitchat(query)
+        if intent == "ignore":
+            return self._handle_ignore(query)
 
         agent = self.agents.get(intent)
         if not agent:
-            logger.warning(f"Unknown intent '{intent}', fallback to chitchat")
-            return self._handle_chitchat(query)
+            logger.warning(f"Unknown intent '{intent}', fallback to ignore")
+            return self._handle_ignore(query)
 
         # Concurrency control with semaphore (Module A2.3)
         try:
@@ -52,8 +52,21 @@ class AgentDispatcher:
             logger.error(f"Request timeout after {_REQUEST_TIMEOUT}s")
             return "Xin lỗi, yêu cầu đã hết thời gian chờ. Vui lòng thử lại."
 
-    def _handle_chitchat(self, query: str) -> str:
+    def _handle_ignore(self, query: str) -> str:
         q = query.lower()
+        is_english = any(w in q for w in ["hello", "hi", "hey", "thank", "bye"]) and not any(w in q for w in ["chào", "cảm ơn", "tạm biệt"])
+
+        if is_english:
+            if any(w in q for w in ["hello", "hi", "hey"]):
+                return "Hello! 👋 I'm the Highlands Coffee assistant. I can help you order drinks, view the menu, or answer your questions. How can I help you today?"
+            if "thank" in q:
+                return "You're welcome! ☕ Happy to help. See you again!"
+            if "bye" in q:
+                return "Goodbye! 👋 Have a great day. Highlands Coffee is always here for you!"
+            if any(w in q for w in ["name", "who", "bot"]):
+                return "I'm the Highlands Coffee chatbot assistant 🤖. I can help you with the menu, ordering, and any questions!"
+            return "Thank you for sharing! ☕ How can I help you today?"
+
         if any(w in q for w in ["chào", "hello", "hi ", "xin chào"]):
             return "Xin chào! 👋 Tôi là trợ lý Highlands Coffee. Tôi có thể giúp bạn đặt đồ uống, trả lời câu hỏi, hoặc tư vấn món ngon. Bạn muốn gì nào?"
         if any(w in q for w in ["cảm ơn", "thank"]):

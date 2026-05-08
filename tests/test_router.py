@@ -30,12 +30,12 @@ TEST_CASES = [
     ("Có gì vừa ngon vừa rẻ không?", "consultant"),
     ("Gợi ý đồ uống cho buổi sáng", "consultant"),
     ("Uống gì ít calo?", "consultant"),
-    # Chitchat intent
-    ("Xin chào!", "chitchat"),
-    ("Cảm ơn bạn nhé", "chitchat"),
-    ("Tạm biệt", "chitchat"),
-    ("Bạn tên gì?", "chitchat"),
-    ("Hôm nay trời đẹp quá", "chitchat"),
+    # Chitchat intent (mapped to 'ignore')
+    ("Xin chào!", "ignore"),
+    ("Cảm ơn bạn nhé", "ignore"),
+    ("Tạm biệt", "ignore"),
+    ("Bạn tên gì?", "ignore"),
+    ("Hôm nay trời đẹp quá", "ignore"),
 ]
 
 
@@ -61,17 +61,26 @@ class TestRouterPrompt:
 class TestRouterAccuracy:
     """Test Router classification accuracy (requires running SGLang)."""
 
-    @pytest.mark.skip(reason="Requires running SGLang server")
+    # @pytest.mark.skip(reason="Requires running SGLang server")
     @pytest.mark.asyncio
     async def test_classification_accuracy(self):
         """Target: ≥ 92% accuracy on 20 test cases."""
         from src.router.serving import classify_intent
 
         correct = 0
+        failed_cases = []
         for query, expected in TEST_CASES:
             result = await classify_intent(query)
             if result["action"] == expected:
                 correct += 1
+            else:
+                failed_cases.append(f"Query: '{query}' -> Expected: {expected}, Got: {result['action']}")
 
         accuracy = correct / len(TEST_CASES)
+        
+        if failed_cases:
+            print("\n--- Failed Cases ---")
+            for f in failed_cases:
+                print(f)
+                
         assert accuracy >= 0.92, f"Accuracy {accuracy:.2%} < 92%"

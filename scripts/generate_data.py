@@ -2,7 +2,7 @@
 Data Generation Pipeline — Module A1.2
 ========================================
 Sinh 4000 samples intent classification dùng LLM API.
-- 1000 samples mỗi intent: order / faq / consultant / chitchat
+- 1000 samples mỗi intent: order / faq / consultant / ignore
 - ~20% hard samples để tăng độ khó
 - Checkpoint/resume để tránh mất data khi bị ngắt
 

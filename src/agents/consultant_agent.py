@@ -33,48 +33,38 @@ class ConsultantAgent(BaseAgent):
         # 1. Context Gathering: Mock Weather
         weather = random.choice(["nóng", "mát mẻ", "mưa", "lạnh"])
         
-        # 2. Graph-based Recommendation
-        # If user asks for a category or characteristic, we use Graph
+        # 3. Handle Context (History)
+        history_text = " ".join([msg["content"].lower() for msg in session_history[-2:]])
+        combined_query = f"{history_text} {query_lower}".strip()
+
+        # If user asks for category in query OR history
         category_target = None
-        if "cà phê" in query_lower or "phin" in query_lower: category_target = "Cà Phê"
-        elif "trà" in query_lower: category_target = "Trà"
-        elif "freeze" in query_lower or "đá xay" in query_lower: category_target = "Freeze"
+        if any(w in combined_query for w in ["cà phê", "phin", "cafe", "coffee", "café"]): category_target = "Cà Phê"
+        elif "trà" in combined_query: category_target = "Trà"
+        elif "freeze" in combined_query or "đá xay" in combined_query: category_target = "Freeze"
 
         try:
             if category_target:
                 graph_items = await neo4j.get_recommendations_by_category(category_target)
-                # Convert Neo4j records back to MenuItem objects safely
                 expanded_results = []
                 for r in graph_items:
                     item = store.get_item_by_name(r['name'])
                     if item:
                         expanded_results.append(item)
             else:
-                expanded_results = store.search_hybrid(query, domain="menu", top_k=4)
+                expanded_results = store.search_hybrid(combined_query, domain="menu", top_k=2)
                 expanded_results = store.expand_graph(expanded_results)
         except Exception:
-            expanded_results = store.search_menu(query, top_k=5)
+            expanded_results = store.search_menu(combined_query, top_k=2)
         
         if not expanded_results:
-            # Fallback to popular items if no match
-            expanded_results = store.search_menu("phin sữa freeze trà sen", top_k=5)
+            expanded_results = store.search_menu("phin sữa", top_k=2)
 
-        # 4. Contextual Filtering & Response Building
-        intro = self._get_contextual_intro(weather, query_lower)
-        menu_text = store.format_menu_items(expanded_results[:5])
+        # 4. Concise Response Building
+        intro = "Dạ, mình gợi ý vài món bán chạy nhất nhé:" if not category_target else f"Dạ, về dòng {category_target}, mình gợi ý món này ạ:"
+        menu_text = store.format_menu_items(expanded_results[:2])
         
-        response = f"{intro}\n\nDựa trên yêu cầu của bạn, mình gợi ý các món sau:\n{menu_text}\n\n"
-        
-        # Add a specific tip based on context
-        if "rẻ" in query_lower or "tiết kiệm" in query_lower:
-            response += "💡 Tip: Các dòng Phin truyền thống đang có giá rất tốt chỉ từ 29k đấy ạ!"
-        elif weather == "nóng":
-            response += "🧊 Tip: Bạn nên chọn dòng Freeze để giải nhiệt tức thì nhé!"
-        elif "mệt" in query_lower or "tỉnh táo" in query_lower:
-            response += "⚡ Tip: Một ly Phin Đen Đá đậm đà sẽ giúp bạn lấy lại năng lượng nhanh nhất!"
-        else:
-            response += "😊 Bạn có muốn mình tư vấn chi tiết hơn về món nào không?"
-
+        response = f"{intro}\n{menu_text}\n\n👉 Bạn muốn đặt món nào ạ?"
         return response
 
     def _get_contextual_intro(self, weather: str, query: str) -> str:
