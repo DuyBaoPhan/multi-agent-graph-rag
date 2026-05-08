@@ -1,11 +1,10 @@
 """
-Order Agent — Module A2.1 (Upgraded)
+Order Agent — Module A2.1 (Hardened)
 ====================================
-Handles ordering, menu queries, cart management (add/remove), and billing.
-Uses KnowledgeStore for menu data and SessionStore for cart state.
+Handles ordering with AI extraction and Redis session persistence.
 """
 
-import re
+import json
 from loguru import logger
 
 from src.agents.base_agent import BaseAgent
@@ -17,106 +16,89 @@ ORDER_SYSTEM_PROMPT = """Bạn là nhân viên phục vụ Highlands Coffee.
 Nhiệm vụ: Giúp khách xem menu, thêm món vào giỏ hàng, xóa món và tính tổng tiền.
 Quy tắc:
 1. Chỉ bán món có trong menu.
-2. Luôn xác nhận lại tên món và số lượng.
-3. Khi tính tiền, liệt kê chi tiết và tổng cộng."""
-
+2. Khi khách hỏi về giỏ hàng hoặc tổng tiền, liệt kê chi tiết và tổng cộng.
+3. Không bao giờ tự bịa ra món ăn."""
 
 class OrderAgent(BaseAgent):
     def __init__(self):
         super().__init__(name="order_agent", system_prompt=ORDER_SYSTEM_PROMPT)
 
-    async def process(
-        self, query: str, session_history: list[dict], session_id: str | None = None
-    ) -> str:
-        # 0. Get Clients
+    async def process(self, query: str, session_history: list[dict], session_id: str | None = None) -> str:
         store = get_knowledge_store()
         neo4j = get_neo4j_client()
         session_store = get_session_store()
         query_lower = query.lower()
 
-        # 1. Get or Init Cart
-        metadata = session_store.get_metadata(session_id) if session_id else {"cart": []}
+        # 1. Get Cart from Redis (CRITICAL FIX)
+        metadata = await session_store.get_metadata_async(session_id)
         cart = metadata.get("cart", [])
 
-        # --- Handle Actions ---
-
-        # Case A: View Cart / Billing
-        if any(kw in query_lower for kw in ["giỏ hàng", "đã đặt", "xem đơn", "tính tiền", "hóa đơn", "bill"]):
+        # Case A: View Cart / Billing (Improved Keywords)
+        billing_keywords = ["giỏ hàng", "đã đặt", "xem đơn", "tính tiền", "hóa đơn", "bill", "tổng", "bao nhiêu", "tiền"]
+        if any(kw in query_lower for kw in billing_keywords) and not any(kw in query_lower for kw in ["thêm", "cho", "lấy", "đặt"]):
             if not cart:
                 return "Dạ, giỏ hàng của mình đang trống ạ. Anh chị muốn dùng gì để em thêm vào ạ?"
             
             bill_lines = [f"- {item['name']} ({item['size']}) x{item['quantity']}: {item['price']*item['quantity']:,}đ" for item in cart]
             total = sum(item['price'] * item['quantity'] for item in cart)
-            
-            if any(kw in query_lower for kw in ["tính tiền", "hóa đơn", "bill"]):
-                return f"Dạ, đây là hóa đơn của mình ạ:\n" + "\n".join(bill_lines) + f"\n\n👉 Tổng cộng: {total:,}đ. Anh chị muốn thanh toán bằng tiền mặt hay chuyển khoản ạ?"
-            return "Dạ, giỏ hàng hiện tại của mình có:\n" + "\n".join(bill_lines) + f"\n\nTổng cộng: {total:,}đ ạ."
+            return f"Dạ, giỏ hàng hiện tại của mình có:\n" + "\n".join(bill_lines) + f"\n\n👉 Tổng cộng: {total:,}đ ạ. Anh chị muốn đặt thêm gì nữa không?"
 
         # Case B: Remove Item
         if any(kw in query_lower for kw in ["xóa", "bỏ", "hủy"]):
-            # Simple heuristic: look for item name in query
             for i, item in enumerate(cart):
                 if item["name"].lower() in query_lower:
                     removed = cart.pop(i)
-                    session_store.update_metadata(session_id, {"cart": cart})
-                    return f"Dạ, em đã xóa {removed['name']} khỏi giỏ hàng rồi ạ. Mình có muốn gọi thêm gì nữa không ạ?"
-            return "Dạ, em không thấy món này trong giỏ hàng. Anh chị kiểm tra lại giúp em nhé."
+                    await session_store.update_metadata(session_id, {"cart": cart})
+                    return f"Dạ, em đã xóa {removed['name']} khỏi giỏ hàng rồi ạ."
 
-        # Case C: Add Item (Search RAG)
-        # 1. Try to find quantity
-        qty_match = re.search(r"(\d+)", query)
-        quantity = int(qty_match.group(1)) if qty_match else 1
-
-        # 2. Try to find size (S, M, L)
-        size_target = None
-        if "size l" in query_lower or "size to" in query_lower or "ly lớn" in query_lower:
-            size_target = "L"
-        elif "size m" in query_lower or "size vừa" in query_lower or "ly vừa" in query_lower:
-            size_target = "M"
-        elif "size s" in query_lower or "size nhỏ" in query_lower or "ly nhỏ" in query_lower:
-            size_target = "S"
-
-        # 3. Try to find item name by stripping action keywords
-        # Refined regex to handle Vietnamese stop words better
-        stop_words = r"(cho|lấy|đặt|thêm|order|mua|gọi|bán|có|còn|ly|cốc|size|vừa|lớn|nhỏ|to|bé|nữa|mình|em|anh|chị)"
-        clean_query = re.sub(stop_words, "", query_lower)
-        clean_query = re.sub(r"\d+", "", clean_query).strip()
+        # Case C: Add Item (AI Extraction)
+        extraction_prompt = f"""Dựa trên yêu cầu của khách: '{query}', hãy trích xuất danh sách các món đồ uống/thức ăn.
+Trả về duy nhất JSON list: [{{"name": "tên món", "quantity": số lượng, "size": "S/M/L hoặc null"}}]
+Ví dụ: "2 ly phin sữa đá size M" -> [{{"name": "Phin Sữa Đá", "quantity": 2, "size": "M"}}]"""
         
-        # 4. Search menu for best match (Graph RAG priority)
         try:
-            # Attempt Graph Search first
-            graph_results = await neo4j.graph_search_menu(clean_query, top_k=5)
-            if graph_results:
-                items = [MenuItem(
-                    name=r['p']['name'], 
-                    price=r['p']['price'], 
-                    size=r['p']['size'], 
-                    category=r['category'],
-                    description=r['p'].get('description', '')
-                ) for r in graph_results]
+            extraction_raw = await self.llm.generate([
+                {"role": "system", "content": "Bạn là chuyên gia bóc tách đơn hàng. Chỉ trả về JSON."},
+                {"role": "user", "content": extraction_prompt}
+            ])
+            items_to_add = json.loads(extraction_raw.strip().replace("```json", "").replace("```", ""))
+        except:
+            items_to_add = [{"name": query_lower, "quantity": 1, "size": None}]
+
+        added_summary = []
+        for item_data in items_to_add:
+            name = item_data.get("name", "")
+            quantity = item_data.get("quantity", 1)
+            size_target = item_data.get("size", "M") # Default to M if not specified
+            
+            # Search menu
+            menu_items = await neo4j.graph_search_menu(name, top_k=5)
+            if not menu_items:
+                menu_items = store.search_menu(name, top_k=5)
             else:
-                items = store.search_menu(clean_query, top_k=10)
-        except Exception as e:
-            logger.warning(f"Neo4j search failed, falling back to KnowledgeStore: {e}")
-            items = store.search_menu(clean_query, top_k=10)
+                # Convert Graph records to objects
+                menu_items = [MenuItem(name=r['p']['name'], price=r['p']['price'], size=r['p']['size'], category=r['category']) for r in menu_items]
 
-        if not items:
-            return f"Dạ, em nghe không rõ tên món. Anh chị muốn 'thêm' món gì cụ thể không ạ? (Ví dụ: 2 bạc xỉu)"
+            if not menu_items: continue
 
-        # 5. Filter by size if requested
-        best_match = items[0]
-        if size_target:
-            size_matches = [i for i in items if i.size == size_target]
-            if size_matches:
-                best_match = size_matches[0]
-        
-        # 6. Add to cart
-        cart.append({
-            "name": best_match.name,
-            "size": best_match.size,
-            "price": best_match.price,
-            "quantity": quantity
-        })
-        session_store.update_metadata(session_id, {"cart": cart})
-        
-        return f"Dạ, em đã thêm {quantity} {best_match.name} size {best_match.size} vào giỏ hàng rồi ạ. Anh chị có muốn dùng thêm gì nữa không ạ?"
+            # Find best match for size
+            best_match = menu_items[0]
+            if size_target:
+                for m in menu_items:
+                    if str(m.size).upper() == str(size_target).upper():
+                        best_match = m
+                        break
+            
+            cart.append({
+                "name": best_match.name,
+                "size": best_match.size,
+                "price": best_match.price,
+                "quantity": quantity
+            })
+            added_summary.append(f"{quantity} {best_match.name} ({best_match.size})")
+
+        if not added_summary:
+            return "Dạ, em chưa rõ món anh chị muốn đặt. Mình vui lòng nói rõ tên món và số lượng giúp em nhé!"
+
+        await session_store.update_metadata(session_id, {"cart": cart})
+        return f"Dạ, em đã thêm {', '.join(added_summary)} vào giỏ hàng rồi ạ. Anh chị có muốn dùng thêm gì nữa không ạ?"

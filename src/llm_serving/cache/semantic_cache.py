@@ -17,9 +17,13 @@ class SemanticCache:
         self.store = get_knowledge_store()
         self._local_index = [] # List of (embedding, query, response)
 
-    async def get(self, query: str) -> str | None:
-        """Find a similar query in cache using Vector Similarity."""
-        if not self.redis or not self.store._embedder:
+    async def get(self, query: str, intent: str = None) -> str | None:
+        """Retrieve from semantic cache, but SKIP if it's a dynamic intent like 'order'."""
+        # STRATEGIC FIX: Never cache or retrieve orders/billing data
+        billing_keywords = ["bill", "tổng", "tiền", "hóa đơn", "thanh toán", "giỏ hàng", "đã đặt"]
+        query_lower = query.lower()
+        
+        if intent in ["order", "billing", "payment"] or any(k in query_lower for k in billing_keywords):
             return None
         
         try:
@@ -49,9 +53,11 @@ class SemanticCache:
         
         return None
 
-    async def set(self, query: str, response: str):
-        """Store query and response in both exact and semantic cache."""
-        if not self.redis:
+    async def set(self, query: str, response: str, intent: str = None):
+        """Store query and response if it's a stable intent (FAQ/Chitchat)."""
+        billing_keywords = ["bill", "tổng", "tiền", "hóa đơn", "thanh toán", "giỏ hàng", "đã đặt"]
+        query_lower = query.lower()
+        if intent in ["order", "billing", "payment"] or any(kw in query_lower for kw in billing_keywords):
             return
         
         try:

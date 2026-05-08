@@ -22,6 +22,12 @@ try:
 except ImportError:
     Llama = None
 
+try:
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+except ImportError:
+    torch = None
+
 from src.config import get_settings
 from src.router.prompt_template import build_router_prompt
 
@@ -29,6 +35,7 @@ VALID_INTENTS = {"order", "faq", "consultant", "chitchat"}
 
 
 class RouterMode(str, Enum):
+    LOCAL_HF   = "local_hf"
     LOCAL_GGUF = "local_gguf"
     SGLANG     = "sglang"
     API        = "api"
@@ -178,6 +185,47 @@ async def _classify_via_local_gguf(query: str) -> dict:
     return _parse_action(text)
 
 
+# --- Local HF Engine (RTX 3060 Optimized) ---
+_hf_model = None
+_hf_tokenizer = None
+
+def _get_local_hf():
+    global _hf_model, _hf_tokenizer
+    if _hf_model is None and torch:
+        # Tự động kiểm tra các đường dẫn có thể có
+        paths_to_check = ["models/router", "models/router/router_merged", "router_merged"]
+        model_path = None
+        for p in paths_to_check:
+            if os.path.exists(os.path.join(p, "config.json")):
+                model_path = p
+                break
+        
+        if model_path:
+            logger.info(f"Loading local HF router from {model_path} to CPU (Optimized)...")
+            _hf_tokenizer = AutoTokenizer.from_pretrained(model_path)
+            _hf_model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                low_cpu_mem_usage=True
+            )
+        else:
+            logger.warning("HF model not found in any of: models/router, models/router/router_merged, or router_merged")
+    return _hf_model, _hf_tokenizer
+
+async def _classify_via_local_hf(query: str) -> dict:
+    model, tokenizer = _get_local_hf()
+    if not model:
+        raise RuntimeError("Local HF engine not initialized")
+    
+    prompt = f"<|im_start|>system\nPhân loại ý định: order, consultant, faq, chitchat. Trả về JSON: {{\"action\": \"intent\"}}<|im_end|>\n<|im_start|>user\n{query}<|im_end|>\n<|im_start|>assistant\n"
+    
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=20, do_sample=False)
+    
+    text = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+    return _parse_action(text)
+
+
 # ─── JSON parser with fallback ────────────────────────────────────────────────
 def _parse_action(text: str) -> dict:
     """Parse JSON {"action": "..."} from model output with fallback."""
@@ -225,7 +273,9 @@ async def classify_intent(
 
     result: dict = {"action": "chitchat"}
     try:
-        if mode == RouterMode.LOCAL_GGUF:
+        if mode == RouterMode.LOCAL_HF:
+            result = await _classify_via_local_hf(query)
+        elif mode == RouterMode.LOCAL_GGUF:
             result = await _classify_via_local_gguf(query)
         elif mode == RouterMode.SGLANG:
             result = await _classify_via_sglang(query)
@@ -251,7 +301,13 @@ async def classify_intent(
 
 async def _detect_best_mode(sglang_url: str) -> RouterMode:
     """Check which router mode is available."""
-    # Priority 1: Local Fine-tuned GGUF (Fastest & Most Accurate)
+    # Priority 1: Local Fine-tuned Merged Model (HF Format)
+    paths_to_check = ["models/router", "models/router/router_merged", "router_merged"]
+    for p in paths_to_check:
+        if os.path.exists(os.path.join(p, "config.json")):
+            return RouterMode.LOCAL_HF
+
+    # Priority 2: Local GGUF (For CPU/Edge)
     if os.path.exists("models/router/router_model.gguf"):
         return RouterMode.LOCAL_GGUF
 

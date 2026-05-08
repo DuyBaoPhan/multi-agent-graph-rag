@@ -34,7 +34,6 @@ async def lifespan(app: FastAPI):
     # Connect services (auto-fallback)
     await neo4j_client.connect()
     await redis_cache.connect()
-    await session_store.start_cleanup_loop()
 
     app.state.neo4j = neo4j_client
     app.state.redis = redis_cache
@@ -49,7 +48,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    await session_store.stop_cleanup_loop()
     await redis_cache.close()
     await neo4j_client.close()
     logger.info("👋 Shutdown complete.")

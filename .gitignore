@@ -29,12 +29,18 @@ env/
 Thumbs.db
 desktop.ini
 
-# Data & Models (large files)
-data/models/*.bin
-data/models/*.safetensors
-data/models/*.gguf
-data/models/*.pt
-data/models/*.onnx
+# Models and Large Binaries (Important)
+models/
+router_merged/
+*.safetensors
+*.bin
+*.gguf
+*.onnx
+*.pth
+*.pt
+*.pth
+*.h5
+*.joblib
 *.awq
 
 # Neo4j data

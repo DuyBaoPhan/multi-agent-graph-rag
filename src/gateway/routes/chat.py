@@ -1,148 +1,98 @@
 """
-Chat Routes — Module A1, A2, B2.2
-====================================
-Chat endpoint + SSE streaming endpoint.
+Chat Route — Gateway Layer
+==========================
+Synchronized with Frontend (demo/index.html)
 """
 
-import asyncio
-import json
 import uuid
-
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+import time
+from fastapi import APIRouter, Request, HTTPException
 from loguru import logger
-from sse_starlette.sse import EventSourceResponse
+from pydantic import BaseModel
 
 from src.router.serving import classify_intent
 from src.agents.dispatcher import AgentDispatcher
-from src.agents.session_store import SessionStore
-from src.guardrails.input_validator import validate_input
+from src.agents.session_store import get_session_store
+from src.agents.generator import get_generator
 from src.llm_serving.cache.semantic_cache import get_semantic_cache
 from src.guardrails.fallback import get_fallback_response
-from src.agents.generator import get_generator
 
 router = APIRouter()
-
 _dispatcher = AgentDispatcher()
-_session_store = SessionStore()
-
+_session_store = get_session_store()
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str # Match frontend: body.message
     session_id: str | None = None
 
-
 class ChatResponse(BaseModel):
-    reply: str
-    session_id: str
+    reply: str # Match frontend: data.reply
     intent: str
     agent: str
-    router_mode: str = "unknown"
-    latency_ms: float = 0.0
-    cached: bool = False
-
+    latency_ms: float
+    session_id: str
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Main chat endpoint — full pipeline."""
-    is_valid, sanitized = validate_input(request.message)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=sanitized)
-
+    start_time = time.time()
+    sanitized = request.message.strip() # Using .message
     session_id = request.session_id or str(uuid.uuid4())
     
-    # 1. Check Semantic Cache (Module C2.2)
-    sem_cache = get_semantic_cache()
-    cached_reply = await sem_cache.get(sanitized)
-    if cached_reply:
-        return ChatResponse(
-            reply=cached_reply,
-            session_id=session_id,
-            intent="cached",
-            agent="semantic_cache",
-            cached=True,
-            latency_ms=0.0
-        )
+    if not sanitized:
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    history = _session_store.get_history(session_id)
-
+    # 0. Identify Intent
     try:
         router_result = await classify_intent(sanitized)
         intent = router_result["action"]
         router_mode = str(router_result.get("mode", "unknown"))
-        latency_ms = router_result.get("latency_ms", 0.0)
     except Exception as e:
         logger.error(f"Router failed: {e}")
-        intent, router_mode, latency_ms = "chitchat", "fallback", 0.0
+        intent, router_mode = "chitchat", "fallback"
 
+    # 1. Semantic Cache Check
+    sem_cache = get_semantic_cache()
+    cached_reply = await sem_cache.get(sanitized, intent=intent)
+    if cached_reply:
+        return ChatResponse(
+            reply=cached_reply, # Using reply
+            intent="cached",
+            agent="semantic_cache",
+            latency_ms=0,
+            session_id=session_id
+        )
+
+    # 2. Dispatch
+    history = await _session_store.get_history(session_id)
     try:
-        reply = await _dispatcher.dispatch(intent, sanitized, history, session_id)
-        # Humanize response via Qwen-7B Generator (Module B2.1)
-        generator = get_generator()
-        reply = await generator.generate(reply, sanitized)
+        raw_reply = await _dispatcher.dispatch(intent, sanitized, history, session_id)
         
-        # 3. Store in Semantic Cache
-        await sem_cache.set(sanitized, reply)
+        # 3. Humanize
+        generator = get_generator()
+        final_reply = await generator.generate(raw_reply, sanitized, history)
+        
+        # 4. Save to Cache
+        await sem_cache.set(sanitized, final_reply, intent=intent)
+        
+        # 5. Save to Session (Redis)
+        await _session_store.add_turn(session_id, sanitized, final_reply)
+        
+        latency = (time.time() - start_time) * 1000
+        return ChatResponse(
+            reply=final_reply, # Using reply
+            intent=intent,
+            agent=f"{intent}_agent ({router_mode})",
+            latency_ms=round(latency, 2),
+            session_id=session_id
+        )
+
     except Exception as e:
-        logger.error(f"Agent failed: {e}")
-        reply = get_fallback_response(intent)
-
-    _session_store.add_turn(session_id, sanitized, reply)
-
-    return ChatResponse(
-        reply=reply,
-        session_id=session_id,
-        intent=intent,
-        agent=f"{intent}_agent",
-        router_mode=router_mode,
-        latency_ms=latency_ms,
-        cached=False,
-    )
-
-
-@router.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
-    """SSE streaming endpoint — sends response token by token (Module B2.2)."""
-    is_valid, sanitized = validate_input(request.message)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=sanitized)
-
-    session_id = request.session_id or str(uuid.uuid4())
-    history = _session_store.get_history(session_id)
-
-    try:
-        router_result = await classify_intent(sanitized)
-        intent = router_result["action"]
-    except Exception:
-        intent = "chitchat"
-
-    try:
-        full_reply = await _dispatcher.dispatch(intent, sanitized, history, session_id)
-    except Exception:
-        full_reply = get_fallback_response(intent)
-
-    _session_store.add_turn(session_id, sanitized, full_reply)
-
-    async def event_generator():
-        """Simulate token-by-token streaming from pre-generated response."""
-        # Send metadata first
-        yield {
-            "event": "metadata",
-            "data": json.dumps({
-                "session_id": session_id,
-                "intent": intent,
-                "agent": f"{intent}_agent",
-            }, ensure_ascii=False),
-        }
-
-        # Stream tokens (split by words for simulation)
-        words = full_reply.split(" ")
-        for i, word in enumerate(words):
-            token = word + (" " if i < len(words) - 1 else "")
-            yield {"data": json.dumps({"token": token}, ensure_ascii=False)}
-            await asyncio.sleep(0.03)  # ~30ms per token
-
-        # Done signal — NOT json.parse'd
-        yield {"data": "[DONE]"}
-
-    return EventSourceResponse(event_generator())
+        logger.error(f"Chat processing failed: {e}")
+        fallback_msg = get_fallback_response(intent)
+        return ChatResponse(
+            reply=fallback_msg, # Using reply
+            intent=intent,
+            agent="fallback_guardrail",
+            latency_ms=0,
+            session_id=session_id
+        )

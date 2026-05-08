@@ -41,20 +41,24 @@ class ResponseGenerator:
         self._last_check = now
         return self.is_healthy
 
-    async def generate(self, raw_data: str, user_query: str) -> str:
+    async def generate(self, raw_data: str, user_query: str, history: list[dict] = None) -> str:
         """Humanize response via LLM if available, otherwise use rule-base."""
         if await self._check_health():
             try:
+                messages = [{"role": "system", "content": GENERATOR_SYSTEM_PROMPT}]
+                if history:
+                    # Keep only last 3 turns for generator context to save tokens
+                    messages.extend(history[-6:])
+                
+                messages.append({"role": "user", "content": f"Dữ liệu thô từ hệ thống: {raw_data}\nCâu hỏi hiện tại của khách: {user_query}"})
+
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     resp = await client.post(
                         self.url,
                         json={
                             "model": "generator",
-                            "messages": [
-                                {"role": "system", "content": GENERATOR_SYSTEM_PROMPT},
-                                {"role": "user", "content": f"Dữ liệu: {raw_data}\nCâu hỏi khách: {user_query}"}
-                            ],
-                            "temperature": 0.7,
+                            "messages": messages,
+                            "temperature": 0.4, # Lower temp for more precision
                         }
                     )
                     resp.raise_for_status()

@@ -25,6 +25,7 @@ ROUTER_FEW_SHOT_EXAMPLES = [
     {"query": "Nên uống gì cho mát vào mùa hè?", "output": '{"action": "consultant"}'},
     {"query": "Cảm ơn bạn nhé!", "output": '{"action": "chitchat"}'},
     {"query": "Có gì vừa ngon vừa rẻ không?", "output": '{"action": "consultant"}'},
+    {"query": "Tổng cộng tiền hết bao nhiêu?", "output": '{"action": "order"}'},
 ]
 
 
